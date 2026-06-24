@@ -1,0 +1,57 @@
+name: Office Reminder Bot
+
+on:
+  schedule:
+    # 08:10 Ulaanbaatar (UTC+8 => 00:10 UTC)
+    - cron: '10 0 * * 1-5'
+
+    # 08:15 Email
+    - cron: '15 0 * * 1-5'
+
+    # 13:00 Ulaanbaatar
+    - cron: '0 5 * * 1-5'
+
+    # 16:30 Email
+    - cron: '30 8 * * 1-5'
+
+    # 16:40 Telegram
+    - cron: '40 8 * * 1-5'
+
+  workflow_dispatch:
+
+jobs:
+  reminder:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install requests
+
+      - name: Set Job Type
+        run: |
+          if [ "${{ github.event.schedule }}" = "10 0 * * 1-5" ]; then
+            echo "JOB_TYPE=telegram_morning" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" = "15 0 * * 1-5" ]; then
+            echo "JOB_TYPE=email_morning" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" = "0 5 * * 1-5" ]; then
+            echo "JOB_TYPE=telegram_noon" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" = "30 8 * * 1-5" ]; then
+            echo "JOB_TYPE=email_evening" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" = "40 8 * * 1-5" ]; then
+            echo "JOB_TYPE=telegram_evening" >> $GITHUB_ENV
+          else
+            echo "JOB_TYPE=telegram_evening" >> $GITHUB_ENV
+          fi
+
+      - run: python send_message.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          JOB_TYPE: ${{ env.JOB_TYPE }}
