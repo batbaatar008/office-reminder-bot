@@ -1,10 +1,25 @@
 name: Office Reminder Bot
 
 on:
+  schedule:
+    - cron: '10 0 * * 1-5'
+    - cron: '0 5 * * 1-5'
+    - cron: '40 8 * * 1-5'
+
   workflow_dispatch:
+    inputs:
+      job_type:
+        description: "Test message type"
+        required: true
+        default: "evening"
+        type: choice
+        options:
+          - morning
+          - noon
+          - evening
 
 jobs:
-  test-sharepoint:
+  reminder:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,5 +36,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Test SharePoint Download
-        run: python test_sharepoint.py
+      - name: Set Job Type
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "JOB_TYPE=${{ github.event.inputs.job_type }}" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" = "10 0 * * 1-5" ]; then
+            echo "JOB_TYPE=morning" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" = "0 5 * * 1-5" ]; then
+            echo "JOB_TYPE=noon" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" = "40 8 * * 1-5" ]; then
+            echo "JOB_TYPE=evening" >> $GITHUB_ENV
+          else
+            echo "JOB_TYPE=evening" >> $GITHUB_ENV
+          fi
+
+      - name: Run Telegram Bot
+        run: python send_message.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          JOB_TYPE: ${{ env.JOB_TYPE }}
