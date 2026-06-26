@@ -1,67 +1,88 @@
 import os
+import sys
 import requests
-import smtplib
-from email.message import EmailMessage
+from datetime import datetime, timezone, timedelta
 
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+JOB_TYPE = os.environ.get("JOB_TYPE", "evening")
 
-EMAIL_USER = os.environ.get("EMAIL_USER")
-EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
+MESSAGE_THREAD_ID = 4
 
-EMAIL_RECIPIENTS = [
-    "munkhbat@dsedn.mn",
-    "enkhtur@dsedn.mn",
-    "tuguldur@dsedn.mn",
-    "ariunjargal@dsedn.mn",
-    "zolzaya@dsedn.mn",
-    "batbaatar@dsedn.mn",
-    "bayarsaikhan@dsedn.mn",
+REPORT_LINK = "https://dsedn-my.sharepoint.com/:x:/g/personal/batbaatar_dsedn_mn/IQDrufGpU0agS6qPGZKJ3gTiAa0ZEF-geadYdU9juHaboQU?rtime=fK8Rv7zQ3kg"
+
+EMPLOYEES = [
+    "Мөнхбат",
+    "Энхтөр",
+    "Төгөлдөр",
+    "Ариунжаргал",
+    "Золзаяа",
+    "Батбаатар",
+    "Баярсайхан",
 ]
 
-JOB_TYPE = os.environ["JOB_TYPE"]
-
-MESSAGES = {
-    "telegram_morning": "Өглөөний мэнд 🌞\n\nӨдрийн төлөвлөгөөгөө гаргаарай.",
-    "telegram_noon": "Сайн уу 👋\n\nӨглөөнөөс хойш хийсэн ажлаа тэмдэглээрэй.",
-    "telegram_evening": "⏰ Сануулга\n\nӨнөөдрийн ажлаа марталгүй бичээрэй, амжилт 💪",
-    "email_morning": "Өдрийн зорилтоо тодорхойлоод, өнөөдрийн хийх ажлаа төлөвлөөрэй.",
-    "email_evening": "Өдрийн тайлангаа бөглөж, хийсэн ажлуудаа тэмдэглээрэй.",
-}
-
-EMAIL_SUBJECTS = {
-    "email_morning": "Өдрийн зорилтын сануулга",
-    "email_evening": "Өдрийн тайлан бөглөх сануулга",
-}
+def today_mongolia():
+    mn_time = datetime.now(timezone.utc) + timedelta(hours=8)
+    return mn_time.strftime("%Y-%m-%d")
 
 def send_telegram(text):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    response = requests.post(url, json={
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": text
-    })
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": CHAT_ID,
+        "message_thread_id": MESSAGE_THREAD_ID,
+        "text": text,
+    }
+    response = requests.post(url, json=payload)
     response.raise_for_status()
     print("Telegram message sent")
 
-def send_email(subject, body):
-    msg = EmailMessage()
-    msg["From"] = EMAIL_USER
-    msg["To"] = ", ".join(EMAIL_RECIPIENTS)
-    msg["Subject"] = subject
-    msg.set_content(body)
+def basic_message():
+    messages = {
+        "morning": f"""🌅 Өглөөний мэнд!
 
-    with smtplib.SMTP("smtp.office365.com", 587) as server:
-        server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASSWORD)
-        server.send_message(msg)
+Өчигдөр хийсэн ажлаа марталгүй тэмдэглээрэй. Өчигдрийн ахиц бол өнөөдрийн ажлын сайн эхлэл шүү 💪
 
-    print("Email sent")
+📝 Ажлын тэмдэглэл:
+{REPORT_LINK}""",
 
-if JOB_TYPE.startswith("telegram"):
-    send_telegram(MESSAGES[JOB_TYPE])
+        "noon": f"""☀️ Өдрийн мэнд!
 
-elif JOB_TYPE.startswith("email"):
-    send_email(EMAIL_SUBJECTS[JOB_TYPE], MESSAGES[JOB_TYPE])
+Үдээс өмнө хийсэн ажлуудаа товч тэмдэглээд аваарай. Жижиг ахиц бүр чухал шүү ✅
+
+📝 Ажлын тэмдэглэл:
+{REPORT_LINK}""",
+
+        "evening": f"""🌇 Ажлын өдөр дуусах дөхөж байна.
+
+Өнөөдрийн хийсэн ажлын тэмдэглэлээ хөтлөөрэй. Өнөөдрөө цэгцэлбэл маргааш илүү амар эхэлнэ 🚀
+
+📝 Ажлын тэмдэглэл:
+{REPORT_LINK}""",
+    }
+
+    return messages.get(JOB_TYPE)
+
+def report_check_message():
+    # Одоогоор Excel унших хэсгийг дараагийн алхамд залгана.
+    # Энд түр placeholder байдлаар явуулж байна.
+    today = today_mongolia()
+
+    return f"""📊 Тайлан шалгах сануулга
+
+Огноо: {today}
+
+Ажлын тэмдэглэлээ бөглөөгүй бол одоо бөглөөрэй. Дараагийн хувилбарт бот энэ Excel-ийг өөрөө уншаад хэн бөглөөгүйг нэрээр нь гаргана 🤖
+
+📝 Ажлын тэмдэглэл:
+{REPORT_LINK}"""
+
+if JOB_TYPE in ["morning", "noon"]:
+    send_telegram(basic_message())
+
+elif JOB_TYPE == "evening":
+    send_telegram(basic_message())
+    send_telegram(report_check_message())
 
 else:
-    raise ValueError(f"Unknown JOB_TYPE: {JOB_TYPE}")
+    print(f"Unknown JOB_TYPE: {JOB_TYPE}")
+    sys.exit(1)
